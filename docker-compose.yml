@@ -1,0 +1,40 @@
+version: "3.7"
+services:
+  database:
+    image: mongo
+    env_file:
+      - ./application/.env
+    container_name: database-poc-internal-auth
+    volumes:
+      - database-poc-internal-auth-volume:/data/db
+    restart: always
+    ports:
+      - "27017:27017"
+    networks:
+      - poc-internal-auth-network
+  api:
+    build:
+      dockerfile: ./docker/api-node.dockerfile
+      context: .
+    image: picpay/api-poc-internal-auth
+    env_file:
+      - ./application/.env
+    restart: always
+    container_name: api-poc-internal-auth
+    volumes:
+      - ./application:/var/www
+      - ./application/node_modules:/var/www/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - poc-internal-auth-network
+    depends_on:
+      - database
+    command: npm run start:dev
+    #command: tail -f /dev/null
+networks:
+  poc-internal-auth-network:
+    name: poc-internal-auth-network
+    driver: bridge
+volumes:
+  database-poc-internal-auth-volume:
