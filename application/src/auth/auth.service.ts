@@ -14,6 +14,10 @@ import { UpdateUserInfoDto } from "./dto/update-user-info.dto";
 
 @Injectable()
 export class AuthService {
+    trustedCallbackURL = [
+        'http://localhost:3034/login'
+    ];
+
     constructor(
         private readonly jwtService: JwtService,
         @InjectModel('LoginRequest') private readonly loginRequestModel: Model<LoginRequest>,
@@ -22,6 +26,10 @@ export class AuthService {
     }
 
     async createLoginInstance (callbackURL: string): Promise<LoginInstanceDto> {
+
+        if(!this.isTrustedCallbackURL(callbackURL))
+            throw new Error('URL de origem não habilitada.');
+
         let securityState = this.getSecurityState();
         let loginInstanceDto =  new LoginInstanceDto('google', this.getGoogleAuthUrl(securityState));
 
@@ -36,7 +44,10 @@ export class AuthService {
         return loginInstanceDto;
     }
 
-    async processOAuth2Response (code: string, state: string): Promise<ProcessOauth2ResponseDto> {
+    async processOAuth2Response (code: string, state: string, hd: string): Promise<ProcessOauth2ResponseDto> {
+
+        if(hd != 'picpay.com')
+            throw new Error('Dominio de e-mail não autorizado');
 
         let loginRequest = await this.loginRequestModel.findOne({state: state});
 
@@ -67,7 +78,7 @@ export class AuthService {
     }
 
     async validateToken (token: string) : Promise<User> {
-        let jwtDecoded = this.jwtService.decode(token);
+        let jwtDecoded = this.jwtService.verify(token);
 
         if(!jwtDecoded)
             throw new Error('Token inválido');
@@ -78,6 +89,12 @@ export class AuthService {
             throw new Error('Nenhum usuário encontrado para o token fornecdio');
 
         return user
+    }
+
+    private isTrustedCallbackURL(callbackURL: string) : boolean {
+        console.log(callbackURL);
+
+        return !!this.trustedCallbackURL.find(trusted => trusted == callbackURL);
     }
 
     private async getUser(userID: string) : Promise<User> | null {
@@ -125,7 +142,8 @@ export class AuthService {
                 access_type: 'online',
                 scope: this.getGoogleAuthScopes(),
                 hd: 'picpay.com',
-                state: securityState
+                state: securityState,
+                prompt: 'select_account',
             })
     }
 
